@@ -49,7 +49,7 @@ Resources:
       Timeout: 300
       Environment:
         Variables:
-            ACCESS_ANALYSER_MASTER_ACCOUNT_ID: !Ref AccessAnalyserMasterAccountId
+            ACCESS_ANALYSER_MASTER_ACCOUNT: !Ref AccessAnalyserMasterAccountId
             ROLE_TO_ASSUME: !Ref RoleToAssume
   LambdaLayerCfnresponse:
     Type: AWS::Lambda::LayerVersion
@@ -101,7 +101,8 @@ Resources:
           - Effect: "Allow"
             Action:
               - logs:CreateLogGroup
-              - 
+              - logs:CreateLogStream
+              - logs:PutLogEvents
             Resource: 
               - !Sub "arn:aws:logs:eu-west-2:${AWS::AccountId}:*"
               - !Sub "arn:aws:logs:eu-west-2:${AWS::AccountId}:log-group:/aws/lambda/Lambda-Enable-Access-Analyser:*"
