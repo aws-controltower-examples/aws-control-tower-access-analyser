@@ -75,6 +75,7 @@ Resources:
             Action: 
               - "sts:AssumeRole"
       Path: "/"
+      RoleName: "LambdaExecutionRole-EnableAccessAnalyser"
       ManagedPolicyArns:
         - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
       Policies: 
