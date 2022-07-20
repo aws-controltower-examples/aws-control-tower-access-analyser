@@ -2,9 +2,10 @@
 
 This CloudFormation Template configures a Lambda Function that leverages parameters parsed into it via CloudFormation Parameter through the use of Environment Variables.  Specifically the Lambda Function does a number of things:
 * Determines whether a Delegated Administrative Account exists for AWS Access Analyser.  If it doesn't then it enables Delegated Administration to the AWS Account ID that is parsed in.
-* For Every Governed Region within AWS Control Tower, it then assumes the AWSControlTowerExecution Role into the Delegeated Administration Account and Creates an Analyser with an Organization Zone of Trust
+* For Every Governed Region within AWS Control Tower, it then assumes the AWSControlTowerExecution Role into the Delegeated Administration Account and Creates an Analyser with an Organization Zone of Trust.
 * For Every Active AWS Account within the Organisation, it then assumes the AWSControlTowerExecution Role into each Active AWS Account and Creates an Analyser with Account Zone of Trust.
-* If the CloudFormation Stack is deleted, it removes the varying Analysers (both Organisation and Account Zone of Trusts) from every AWS Account and then deregisters the Delegated Administration
+* If the CloudFormation Stack is deleted, it removes the varying Analysers (both Organisation and Account Zone of Trusts) from every AWS Account and then deregisters the Delegated Administration.
+* Since this Solution has been developed for use as an add-on for AWS Control Tower, Access Analyser Archive Rules have been created specifically for the purpose of reducing false positives highlighted by the AWSControlTowerExecution IAM Role and the IAM Roles that are created by AWS Single Sign-On as a result of the Permission Sets implemented.
 
 The rationale behind this is for a number of reasons:
 * The Organizational Zone of Trust provides visibility to a Single AWS Account (through Delegated Administration) the ability to have visibility of everything going on within the Organisation e.g. all IAM Roles, S3 Buckets.  However and this is just from what I've personally noticed is that it doesn't seem to have visibility of SQS Policies, KMS Key Policies, Lambda Functions, Lambda Layer Version or Secrets Manager Secrets.

@@ -92,11 +92,6 @@ Resources:
                 "aws:PrincipalOrgId": !Ref OrganizationId
           - Effect: "Allow"
             Action:
-              - access-analyzer:CreateAnalyzer
-              - access-analyzer:DeleteAnalyzer
-            Resource: "arn:aws:access-analyzer:*:*:analyzer/*"
-          - Effect: "Allow"
-            Action:
               - organizations:DeregisterDelegatedAdministrator
             Resource: !Sub "arn:aws:organizations::${AWS::AccountId}:account/${OrganizationId}/*"
           - Effect: "Allow"

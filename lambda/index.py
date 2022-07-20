@@ -35,26 +35,25 @@ def lambda_handler(event, context):
                     except ClientError as error:
                         print(error)
                 access_analyser_master_account_session=assume_role(access_analyser_master_account, role_to_assume)
-
                 for region in control_tower_regions:
                     access_analyser_client=access_analyser_master_account_session.client('accessanalyzer', region_name=region)
                     try:
-                        response=access_analyser_client.create_analyzer(
+                        analyser_arn=access_analyser_client.create_analyzer(
                             analyzerName=f"Organization-Zone-of-Trust-{region}",
                             type='ORGANIZATION'
-                        )
-                        print(f"Successfully configured an Access Analyzer with an Organization Zone of Trust for Account ID {access_analyser_master_account} in Region {region}.")
+                        )['arn']
+                        org_archive_rule(access_analyser_client, region, analyser_arn)
                     except ClientError as error:
                         print(error)
                 for account in accounts:
                     member_session=assume_role(account['Id'], role_to_assume)
                     member_client=member_session.client('accessanalyzer', region_name=ct_home_region)
                     try:
-                        member_client.create_analyzer(
+                        analyser_arn=member_client.create_analyzer(
                             analyzerName=f"Account-Zone-of-Trust-{account['Id']}",
                             type='ACCOUNT'
-                        )
-                        print(f"Successfully configured an Access Analyzer with an Account Zone of Trust for Account ID {account['Id']} in Region {region}.")
+                        )['arn']
+                        account_archive_rule(member_client, account, analyser_arn)
                     except ClientError as error:
                         print(error)
                 cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
@@ -70,17 +69,15 @@ def lambda_handler(event, context):
                         response=access_analyser_client.delete_analyzer(
                             analyzerName=f"Organization-Zone-of-Trust-{region}"
                         )
-                        print(f"Successfully deleted an Access Analyzer with an Organization Zone of Trust for Account ID {access_analyser_master_account} in Region {region}.")
                     except ClientError as error:
                         print(error)
                 for account in accounts:
                     member_session=assume_role(account['Id'], role_to_assume)
                     member_client=member_session.client('accessanalyzer', region_name=ct_home_region)
                     try:
-                        member_client.delete_analyzer(
+                        response=member_client.delete_analyzer(
                             analyzerName=f"Account-Zone-of-Trust-{account['Id']}"
                         )
-                        print(f"Successfully deleted an Access Analyzer with an Account Zone of Trust for Account ID {account['Id']} in Region {region}.")
                     except ClientError as error:
                         print(error)
                 org_client.deregister_delegated_administrator(
@@ -92,6 +89,43 @@ def lambda_handler(event, context):
             except ClientError as error:
                 print(error) 
                 cfnresponse.send(event, context, cfnresponse.FAILED, error)
+    else:
+        access_analyser_delegated_admin=org_client.list_delegated_administrators(
+            ServicePrincipal='access-analyzer.amazonaws.com'
+        )
+        if access_analyser_delegated_admin['DelegatedAdministrators']:
+            print(f"Delegated Administration has already been configured for Access Analyser to Account ID: {access_analyser_delegated_admin['DelegatedAdministrators'][0]['Id']}.")
+        else:
+            try:
+                org_client.register_delegated_administrator(
+                    AccountId=access_analyser_master_account,
+                    ServicePrincipal='access-analyzer.amazonaws.com'
+                )
+                print(f"Delegated Administration for Access Analyzer is now configured to Account ID {access_analyser_master_account}.")
+            except ClientError as error:
+                print(error)
+        access_analyser_master_account_session=assume_role(access_analyser_master_account, role_to_assume)
+        for region in control_tower_regions:
+            access_analyser_client=access_analyser_master_account_session.client('accessanalyzer', region_name=region)
+            try:
+                analyser_arn=access_analyser_client.create_analyzer(
+                    analyzerName=f"Organization-Zone-of-Trust-{region}",
+                    type='ORGANIZATION'
+                )['arn']
+                org_archive_rule(access_analyser_client, region, analyser_arn)
+            except ClientError as error:
+                print(error)
+        for account in accounts:
+            member_session=assume_role(account['Id'], role_to_assume)
+            member_client=member_session.client('accessanalyzer', region_name=ct_home_region)
+            try:
+                analyser_arn=member_client.create_analyzer(
+                    analyzerName=f"Account-Zone-of-Trust-{account['Id']}",
+                    type='ACCOUNT'
+                )['arn']
+                account_archive_rule(member_client, account, analyser_arn)
+            except ClientError as error:
+                print(error)
 
 def assume_role(aws_account_id, role_to_assume):
     sts_client=boto3.client('sts')
@@ -138,3 +172,91 @@ def get_all_accounts():
         if account['Status'] == 'ACTIVE':
             active_accounts.append(account)
     return active_accounts
+
+def org_archive_rule(access_analyser_client, region, analyser_arn):
+    try:
+        access_analyser_client.create_archive_rule(
+            analyzerName=f"Organization-Zone-of-Trust-{region}",
+            filter={
+                'resource': {
+                    'contains': [
+                        'AWSControlTowerExecution',
+                    ]
+                }
+            },
+            ruleName='Archive-AWSControlTowerExecution'
+        )
+    except ClientError as error:
+        print(error)
+    try:
+        access_analyser_client.create_archive_rule(
+            analyzerName=f"Organization-Zone-of-Trust-{region}",
+            filter={
+                'resource': {
+                    'contains': [
+                        'sso.amazonaws.com',
+                    ]
+                }
+            },
+            ruleName='Archive-SSO-Permission-Sets'
+        )
+    except ClientError as error:
+        print(error)
+    try:
+        access_analyser_client.apply_archive_rule(
+            analyzerArn=analyser_arn,
+            ruleName='Archive-AWSControlTowerExecution'
+        )
+    except ClientError as error:
+        print(error)
+    try:
+        access_analyser_client.apply_archive_rule(
+            analyzerArn=analyser_arn,
+            ruleName='Archive-SSO-Permission-Sets'
+        )
+    except ClientError as error:
+        print(error)
+
+def account_archive_rule(member_client, account, analyser_arn):
+    try:
+        member_client.create_archive_rule(
+            analyzerName=f"Account-Zone-of-Trust-{account['Id']}",
+            filter={
+                'resource': {
+                    'contains': [
+                        'AWSControlTowerExecution',
+                    ]
+                }
+            },
+            ruleName='Archive-AWSControlTowerExecution'
+        )
+    except ClientError as error:
+        print(error)
+    try:
+        member_client.create_archive_rule(
+            analyzerName=f"Account-Zone-of-Trust-{account['Id']}",
+            filter={
+                'resource': {
+                    'contains': [
+                        'sso.amazonaws.com',
+                    ]
+                }
+            },
+            ruleName='Archive-SSO-Permission-Sets'
+        )
+    except ClientError as error:
+        print(error)
+    try:
+        member_client.apply_archive_rule(
+            analyzerArn=analyser_arn,
+            ruleName='Archive-AWSControlTowerExecution'
+        )
+    except ClientError as error:
+        print(error)
+    try:
+        member_client.apply_archive_rule(
+            analyzerArn=analyser_arn,
+            ruleName='Archive-SSO-Permission-Sets'
+        )
+    except ClientError as error:
+        print(error)
