@@ -100,8 +100,8 @@ Resources:
               - logs:CreateLogStream
               - logs:PutLogEvents
             Resource: 
-              - !Sub "arn:aws:logs:eu-west-2:${AWS::AccountId}:*"
-              - !Sub "arn:aws:logs:eu-west-2:${AWS::AccountId}:log-group:/aws/lambda/Lambda-Enable-Access-Analyser:*"
+              - !Sub "arn:aws:logs:{AWS::Region}:${AWS::AccountId}:*"
+              - !Sub "arn:aws:logs:{AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/Lambda-Enable-Access-Analyser:*"
           - Effect: "Allow"
             Action:
               - organizations:RegisterDelegatedAdministrator
