@@ -33,7 +33,7 @@ def lambda_handler(event, context):
                         )
                         print(f"Delegated Administration for Access Analyzer is now configured to Account ID {access_analyser_master_account}.")
                     except ClientError as error:
-                        print(error)
+                        print(f"Delegated Administration for Access Analyzer is already configured. Error: {error}.")
                 access_analyser_master_account_session=assume_role(access_analyser_master_account, role_to_assume)
                 for region in control_tower_regions:
                     access_analyser_client=access_analyser_master_account_session.client('accessanalyzer', region_name=region)
@@ -44,7 +44,7 @@ def lambda_handler(event, context):
                         )['arn']
                         org_archive_rule(access_analyser_client, region, analyser_arn)
                     except ClientError as error:
-                        print(error)
+                        print(f"An Access Analyzer of the same name with an Organization Zone of Trust already exists in {region}. Error: {error}.")
                 for account in accounts:
                     member_session=assume_role(account['Id'], role_to_assume)
                     member_client=member_session.client('accessanalyzer', region_name=ct_home_region)
@@ -55,7 +55,7 @@ def lambda_handler(event, context):
                         )['arn']
                         account_archive_rule(member_client, account, analyser_arn)
                     except ClientError as error:
-                        print(error)
+                        print(f"An Access Analyzer of the same name with an Account Zone of Trust already exsits in Account ID: {account['Id']}. Error: {error}.")
                 cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
             except ClientError as error:
                 print(error) 
@@ -80,11 +80,14 @@ def lambda_handler(event, context):
                         )
                     except ClientError as error:
                         print(error)
-                org_client.deregister_delegated_administrator(
-                    AccountId=access_analyser_master_account,
-                    ServicePrincipal='access-analyzer.amazonaws.com'
-                )
-                print(f"Delegated Administration for Access Analyzer is now disabled.")
+                try:
+                    org_client.deregister_delegated_administrator(
+                        AccountId=access_analyser_master_account,
+                        ServicePrincipal='access-analyzer.amazonaws.com'
+                    )
+                    print(f"Delegated Administration for Access Analyzer is now disabled.")
+                except ClientError as error:
+                    print(f"Unable to Deregister Access Analyzer for Delegated Administration. Error: {error}.")
                 cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
             except ClientError as error:
                 print(error) 
@@ -103,7 +106,7 @@ def lambda_handler(event, context):
                 )
                 print(f"Delegated Administration for Access Analyzer is now configured to Account ID {access_analyser_master_account}.")
             except ClientError as error:
-                print(error)
+                print(f"Delegated Administration for Access Analyzer is already configured. Error: {error}.")
         access_analyser_master_account_session=assume_role(access_analyser_master_account, role_to_assume)
         for region in control_tower_regions:
             access_analyser_client=access_analyser_master_account_session.client('accessanalyzer', region_name=region)
@@ -114,7 +117,7 @@ def lambda_handler(event, context):
                 )['arn']
                 org_archive_rule(access_analyser_client, region, analyser_arn)
             except ClientError as error:
-                print(error)
+                print(f"An Access Analyzer of the same name with an Organization Zone of Trust already exists in {region}. Error: {error}.")
         for account in accounts:
             member_session=assume_role(account['Id'], role_to_assume)
             member_client=member_session.client('accessanalyzer', region_name=ct_home_region)
@@ -125,7 +128,7 @@ def lambda_handler(event, context):
                 )['arn']
                 account_archive_rule(member_client, account, analyser_arn)
             except ClientError as error:
-                print(error)
+                print(f"An Access Analyzer of the same name with an Account Zone of Trust already exsits in Account ID: {account['Id']}. Error: {error}.")
 
 def assume_role(aws_account_id, role_to_assume):
     sts_client=boto3.client('sts')
