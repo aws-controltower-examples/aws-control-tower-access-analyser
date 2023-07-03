@@ -30,12 +30,12 @@ Resources:
     Type: Custom::EnableAccessAnalyser
     Properties:
       ServiceToken: !GetAtt LambdaEnableAccessAnalyser.Arn
-  LambdaEnableAccessAnalyser: 
+  LambdaEnableAccessAnalyser:
     Type: AWS::Lambda::Function
     Properties:
       Architectures:
         - x86_64
-      Code: 
+      Code:
         S3Bucket: !Ref S3SourceBucket
         S3Key: !Ref S3Key
       Description: "Lambda Function that is triggered by CloudFormation Custom Resource to Enable Access Analyser by Default."
@@ -61,24 +61,24 @@ Resources:
         S3Key: "lambda-layers/cfnresponse.zip"
       Description: v1.1.2 of cfnresponse
       LayerName: cfnresponse
-  LambdaRoleEnableAccessAnalyser: 
+  LambdaRoleEnableAccessAnalyser:
     Type: AWS::IAM::Role
-    Properties: 
+    Properties:
       Description: "Service-Role for Lambda-Enable-Access-Analyser to have the required access to execute successfully"
-      AssumeRolePolicyDocument: 
+      AssumeRolePolicyDocument:
         Version: "2012-10-17"
-        Statement: 
+        Statement:
           - Effect: "Allow"
-            Principal: 
-              Service: 
+            Principal:
+              Service:
                 - "lambda.amazonaws.com"
-            Action: 
+            Action:
               - "sts:AssumeRole"
       Path: "/"
       RoleName: "LambdaExecutionRole-EnableAccessAnalyser"
       ManagedPolicyArns:
         - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-      Policies: 
+      Policies:
       - PolicyName: "Enable-Access-Analyser"
         PolicyDocument:
           Version: "2012-10-17"
@@ -99,7 +99,7 @@ Resources:
               - logs:CreateLogGroup
               - logs:CreateLogStream
               - logs:PutLogEvents
-            Resource: 
+            Resource:
               - !Sub "arn:aws:logs:{AWS::Region}:${AWS::AccountId}:*"
               - !Sub "arn:aws:logs:{AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/Lambda-Enable-Access-Analyser:*"
           - Effect: "Allow"
@@ -110,12 +110,12 @@ Resources:
               - cloudtrail:DescribeTrails
               - cloudformation:ListStackInstances
             Resource: "*"
-  LifeCycleRuleAccessAnalyser: 
+  LifeCycleRuleAccessAnalyser:
     Type: AWS::Events::Rule
-    Properties: 
+    Properties:
       Description: "AWS Access Analyser LifeCycle Trigger"
       EventPattern:
-        source: 
+        source:
           - "aws.controltower"
         detail-type:
           - "AWS Service Event via CloudTrail"
@@ -123,12 +123,12 @@ Resources:
           eventName:
             - "CreateManagedAccount"
       State: "ENABLED"
-      Targets: 
+      Targets:
         - Arn: !GetAtt LambdaEnableAccessAnalyser.Arn
           Id: "NewAccount"
-  PermissionForCTEventToInvokeLambda: 
+  PermissionForCTEventToInvokeLambda:
     Type: AWS::Lambda::Permission
-    Properties: 
+    Properties:
       FunctionName: !GetAtt LambdaEnableAccessAnalyser.Arn
       Action: "lambda:InvokeFunction"
       Principal: "events.amazonaws.com"
