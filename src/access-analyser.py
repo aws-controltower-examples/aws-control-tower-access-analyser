@@ -5,6 +5,7 @@ from botocore.exceptions import ClientError
 
 access_analyser_master_account=os.environ['ACCESS_ANALYSER_MASTER_ACCOUNT']
 role_to_assume=os.environ['ROLE_TO_ASSUME']
+excluded_accounts=os.environ['EXCLUDED_ACCOUNTS']
 
 org_client=boto3.client('organizations')
 cloudtrail_client=boto3.client('cloudtrail')
@@ -46,16 +47,19 @@ def lambda_handler(event, context):
                     except ClientError as error:
                         print(f"An Access Analyzer of the same name with an Organization Zone of Trust already exists in {region}. Error: {error}.")
                 for account in accounts:
-                    member_session=assume_role(account['Id'], role_to_assume)
-                    member_client=member_session.client('accessanalyzer', region_name=ct_home_region)
-                    try:
-                        analyser_arn=member_client.create_analyzer(
-                            analyzerName=f"Account-Zone-of-Trust-{account['Id']}",
-                            type='ACCOUNT'
-                        )['arn']
-                        account_archive_rule(member_client, account, analyser_arn)
-                    except ClientError as error:
-                        print(f"An Access Analyzer of the same name with an Account Zone of Trust already exsits in Account ID: {account['Id']}. Error: {error}.")
+                    if account['Id'] not in excluded_accounts:
+                        member_session=assume_role(account['Id'], role_to_assume)
+                        member_client=member_session.client('accessanalyzer', region_name=ct_home_region)
+                        try:
+                            analyser_arn=member_client.create_analyzer(
+                                analyzerName=f"Account-Zone-of-Trust-{account['Id']}",
+                                type='ACCOUNT'
+                            )['arn']
+                            account_archive_rule(member_client, account, analyser_arn)
+                        except ClientError as error:
+                            print(f"An Access Analyzer of the same name with an Account Zone of Trust already exsits in Account ID: {account['Id']}. Error: {error}.")
+                    else:
+                         print(f'Account excluded: {account}')
                 cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
             except ClientError as error:
                 print(error) 
@@ -72,14 +76,17 @@ def lambda_handler(event, context):
                     except ClientError as error:
                         print(error)
                 for account in accounts:
-                    member_session=assume_role(account['Id'], role_to_assume)
-                    member_client=member_session.client('accessanalyzer', region_name=ct_home_region)
-                    try:
-                        response=member_client.delete_analyzer(
-                            analyzerName=f"Account-Zone-of-Trust-{account['Id']}"
-                        )
-                    except ClientError as error:
-                        print(error)
+                    if account['Id'] not in excluded_accounts:
+                        member_session=assume_role(account['Id'], role_to_assume)
+                        member_client=member_session.client('accessanalyzer', region_name=ct_home_region)
+                        try:
+                            response=member_client.delete_analyzer(
+                                analyzerName=f"Account-Zone-of-Trust-{account['Id']}"
+                            )
+                        except ClientError as error:
+                            print(error)
+                    else:
+                        print(f'Account excluded: {account}')
                 try:
                     org_client.deregister_delegated_administrator(
                         AccountId=access_analyser_master_account,
@@ -119,17 +126,20 @@ def lambda_handler(event, context):
             except ClientError as error:
                 print(f"An Access Analyzer of the same name with an Organization Zone of Trust already exists in {region}. Error: {error}.")
         for account in accounts:
-            member_session=assume_role(account['Id'], role_to_assume)
-            member_client=member_session.client('accessanalyzer', region_name=ct_home_region)
-            try:
-                analyser_arn=member_client.create_analyzer(
-                    analyzerName=f"Account-Zone-of-Trust-{account['Id']}",
-                    type='ACCOUNT'
-                )['arn']
-                account_archive_rule(member_client, account, analyser_arn)
-            except ClientError as error:
-                print(f"An Access Analyzer of the same name with an Account Zone of Trust already exsits in Account ID: {account['Id']}. Error: {error}.")
-
+            if account['Id'] not in excluded_accounts:
+                member_session=assume_role(account['Id'], role_to_assume)
+                member_client=member_session.client('accessanalyzer', region_name=ct_home_region)
+                try:
+                    analyser_arn=member_client.create_analyzer(
+                        analyzerName=f"Account-Zone-of-Trust-{account['Id']}",
+                        type='ACCOUNT'
+                    )['arn']
+                    account_archive_rule(member_client, account, analyser_arn)
+                except ClientError as error:
+                    print(f"An Access Analyzer of the same name with an Account Zone of Trust already exsits in Account ID: {account['Id']}. Error: {error}.")
+            else:
+                print(f'Account excluded: {account}')
+                        
 def assume_role(aws_account_id, role_to_assume):
     sts_client=boto3.client('sts')
     response=sts_client.assume_role(
