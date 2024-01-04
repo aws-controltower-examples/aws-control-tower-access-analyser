@@ -15,6 +15,11 @@ Parameters:
     ConstraintDescription: "This must be a 12 character string."
     MinLength: 12
     MaxLength: 12
+  ExcludedAccounts:
+    Description: Excluded Accounts list. This list should contain Management account, Log Archive and Audit accounts at the minimum
+    Default: ""
+    MaxLength: 2000
+    Type: String
   S3SourceBucket:
     Type: String
     Description: "The S3 Bucket that contains the Lambda Zip File."
@@ -27,7 +32,7 @@ Parameters:
     Description: "What role should be assumed in accounts to enable GuardDuty?  The Default is AWSControlTowerExecution for a Control Tower environment."
 Resources:
   CustomResourceEnableAccessAnalyser:
-    Type: Custom::EnableAccessAnalyser
+    Type: Custom::EnablesAccessAnalyzer
     Properties:
       ServiceToken: !GetAtt LambdaEnableAccessAnalyser.Arn
   LambdaEnableAccessAnalyser:
@@ -51,6 +56,7 @@ Resources:
         Variables:
             ACCESS_ANALYSER_MASTER_ACCOUNT: !Ref AccessAnalyserMasterAccountId
             ROLE_TO_ASSUME: !Ref RoleToAssume
+            EXCLUDED_ACCOUNTS: !Ref ExcludedAccounts
   LambdaLayerCfnresponse:
     Type: AWS::Lambda::LayerVersion
     Properties:
@@ -58,7 +64,7 @@ Resources:
         - python3.9
       Content:
         S3Bucket: !Ref S3SourceBucket
-        S3Key: "lambda-layers/cfnresponse.zip"
+        S3Key: "access-analyser/cfnresponse.zip"
       Description: v1.1.2 of cfnresponse
       LayerName: cfnresponse
   LambdaRoleEnableAccessAnalyser:
@@ -79,37 +85,36 @@ Resources:
       ManagedPolicyArns:
         - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
       Policies:
-      - PolicyName: "Enable-Access-Analyser"
+      - PolicyName: Enable-Access-Analyser
         PolicyDocument:
-          Version: "2012-10-17"
+          Version: 2012-10-17
           Statement:
-          - Effect: "Allow"
+          - Effect: Allow
             Action:
-              - "sts:AssumeRole"
-            Resource: !Sub "arn:aws:iam::*:role/${RoleToAssume}"
+              - sts:AssumeRole
+            Resource: !Sub 'arn:aws:iam::*:role/${RoleToAssume}'
             Condition:
               StringEquals:
                 "aws:PrincipalOrgId": !Ref OrganizationId
-          - Effect: "Allow"
+          - Effect: Allow
             Action:
               - organizations:DeregisterDelegatedAdministrator
-            Resource: !Sub "arn:aws:organizations::${AWS::AccountId}:account/${OrganizationId}/*"
-          - Effect: "Allow"
+            Resource: !Sub 'arn:aws:organizations::${AWS::AccountId}:account/${OrganizationId}/*'
+          - Effect: Allow
             Action:
-              - logs:CreateLogGroup
-              - logs:CreateLogStream
-              - logs:PutLogEvents
-            Resource:
-              - !Sub "arn:aws:logs:{AWS::Region}:${AWS::AccountId}:*"
-              - !Sub "arn:aws:logs:{AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/Lambda-Enable-Access-Analyser:*"
-          - Effect: "Allow"
+              - 'logs:CreateLogGroup'
+              - 'logs:CreateLogStream'
+              - 'logs:PutLogEvents'
+            Resource: 
+              -  !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/*'
+          - Effect: Allow
             Action:
-              - organizations:RegisterDelegatedAdministrator
-              - organizations:ListAccounts
-              - organizations:ListDelegatedAdministrators
-              - cloudtrail:DescribeTrails
-              - cloudformation:ListStackInstances
-            Resource: "*"
+              - 'organizations:RegisterDelegatedAdministrator'
+              - 'organizations:ListAccounts'
+              - 'organizations:ListDelegatedAdministrators'
+              - 'cloudtrail:DescribeTrails'
+              - 'cloudformation:ListStackInstances'
+            Resource: '*'
   LifeCycleRuleAccessAnalyser:
     Type: AWS::Events::Rule
     Properties:
